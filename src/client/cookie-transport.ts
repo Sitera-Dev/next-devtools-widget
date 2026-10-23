@@ -65,6 +65,15 @@ export async function parseCookieValue(val: string): Promise<DevToolsEntry | nul
   }
 }
 
+function expireCookie(name: string): void {
+  const isHttps = typeof location !== "undefined" && location.protocol === "https:";
+  const secure = isHttps ? "; Secure" : "";
+  // Deleting cookies created with Secure on HTTPS requires the Secure attribute
+  document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secure}`;
+  document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT${secure}`;
+  document.cookie = `${name}=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT${secure}`;
+}
+
 /**
  * Scans document.cookie for ephemeral traces left by server-side fetch or actions
  * in serverless environments (e.g. Vercel Lambdas), emits them to the DevTools store,
@@ -87,8 +96,8 @@ export function drainTraceCookies(emit: (entry: DevToolsEntry) => void): void {
     const name = trimmed.slice(0, eqIdx).trim();
     const val = trimmed.slice(eqIdx + 1).trim();
 
-    // Expire immediately so subsequent scans never process this cookie again
-    document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+    // Expire immediately with proper Secure / Path flags so it never blocks subsequent requests
+    expireCookie(name);
 
     try {
       if (val.startsWith("z:")) {

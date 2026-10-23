@@ -1713,6 +1713,13 @@ async function parseCookieValue(val) {
     return null;
   }
 }
+function expireCookie(name) {
+  const isHttps = typeof location !== "undefined" && location.protocol === "https:";
+  const secure = isHttps ? "; Secure" : "";
+  document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secure}`;
+  document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT${secure}`;
+  document.cookie = `${name}=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT${secure}`;
+}
 function drainTraceCookies(emit) {
   if (typeof document === "undefined" || !document.cookie) return;
   const rawCookies = document.cookie;
@@ -1725,7 +1732,7 @@ function drainTraceCookies(emit) {
     if (eqIdx === -1) continue;
     const name = trimmed.slice(0, eqIdx).trim();
     const val = trimmed.slice(eqIdx + 1).trim();
-    document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+    expireCookie(name);
     try {
       if (val.startsWith("z:")) {
         void parseCookieValue(val).then((entry) => {

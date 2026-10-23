@@ -300,7 +300,8 @@ async function writeTraceCookie(entry) {
       };
       encoded = encodeTracePayload(minimalPayload);
     }
-    const cookieName = `${TRACE_COOKIE_PREFIX}${entry.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(-12)}`;
+    const slot = Math.floor(Math.random() * 4);
+    const cookieName = `${TRACE_COOKIE_PREFIX}${slot}`;
     const isProd = process.env.NODE_ENV === "production";
     cookieJar.set(cookieName, encoded, {
       path: "/",
