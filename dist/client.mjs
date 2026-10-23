@@ -1751,7 +1751,9 @@ function observe(url, [input, init], headers, promise, emit) {
         });
       }
       drainTraceCookies(emit);
-      setTimeout(() => drainTraceCookies(emit), 30);
+      setTimeout(() => drainTraceCookies(emit), 20);
+      setTimeout(() => drainTraceCookies(emit), 100);
+      setTimeout(() => drainTraceCookies(emit), 300);
     },
     (err) => {
       const message = err?.message || "Client fetch failed";
@@ -1765,7 +1767,9 @@ function observe(url, [input, init], headers, promise, emit) {
         emit({ ...actionBase(), error: message, durationMs: performance.now() - t0 });
       }
       drainTraceCookies(emit);
-      setTimeout(() => drainTraceCookies(emit), 30);
+      setTimeout(() => drainTraceCookies(emit), 20);
+      setTimeout(() => drainTraceCookies(emit), 100);
+      setTimeout(() => drainTraceCookies(emit), 300);
     }
   );
 }

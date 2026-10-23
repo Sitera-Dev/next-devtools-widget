@@ -356,7 +356,7 @@ async function writeTraceCookie(entry) {
   }
 }
 function wrapFetch(original) {
-  const wrapped = function devtoolsFetch(...args) {
+  const wrapped = async function devtoolsFetch(...args) {
     if (fetchContext.getStore()) {
       return original.apply(this, args);
     }
@@ -386,85 +386,85 @@ function wrapFetch(original) {
     if (broadcaster.hasListeners()) {
       broadcaster.broadcast(entry);
     }
-    const promise = fetchContext.run(true, () => original.apply(this, args));
-    trackInFlightFetch(promise);
-    promise.then(
-      async (response) => {
-        const ttfbMs = performance.now() - t0;
-        const clone = safeClone(response);
-        const tBody = performance.now();
-        const [captured, reqBody] = await Promise.all([
-          clone ? captureResponseBody(clone) : Promise.resolve(null),
-          reqClone ? reqClone.text().catch(() => null) : Promise.resolve(null)
-        ]);
-        const now = performance.now();
-        const request = reqBody != null ? { ...entry.request, body: reqBody } : entry.request;
-        const completedEntry = {
-          ...entry,
-          request,
-          state: "completed",
-          response: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: headersToObject(response.headers),
-            body: captured?.body ?? null,
-            bodyEncoding: captured?.encoding,
-            bodyTruncated: captured?.truncated,
-            contentType: captured?.contentType,
-            size: captured?.size,
-            durationMs: now - t0,
-            ttfbMs,
-            downloadMs: now - tBody
-          }
-        };
-        recordSsrTrace(completedEntry);
-        if (broadcaster.hasListeners()) {
-          broadcaster.broadcast(completedEntry);
+    const rawPromise = fetchContext.run(true, () => original.apply(this, args));
+    trackInFlightFetch(rawPromise);
+    try {
+      const response = await rawPromise;
+      const ttfbMs = performance.now() - t0;
+      const clone = safeClone(response);
+      const tBody = performance.now();
+      const [captured, reqBody] = await Promise.all([
+        clone ? captureResponseBody(clone) : Promise.resolve(null),
+        reqClone ? reqClone.text().catch(() => null) : Promise.resolve(null)
+      ]);
+      const now = performance.now();
+      const request = reqBody != null ? { ...entry.request, body: reqBody } : entry.request;
+      const completedEntry = {
+        ...entry,
+        request,
+        state: "completed",
+        response: {
+          status: response.status,
+          statusText: response.statusText,
+          headers: headersToObject(response.headers),
+          body: captured?.body ?? null,
+          bodyEncoding: captured?.encoding,
+          bodyTruncated: captured?.truncated,
+          contentType: captured?.contentType,
+          size: captured?.size,
+          durationMs: now - t0,
+          ttfbMs,
+          downloadMs: now - tBody
         }
-        void writeTraceCookie(completedEntry);
-        const cache = isCacheable(init);
-        if (cache) {
-          const header = response.headers.get("x-nextjs-cache");
-          const status = header === "HIT" || header === "MISS" || header === "STALE" ? header : ttfbMs < 2 ? "HIT" : "MISS";
-          if (broadcaster.hasListeners()) {
-            broadcaster.broadcast({
-              id: genId("cch"),
-              category: "cache",
-              key: `${method} ${url}`,
-              url,
-              tags: cache.tags,
-              revalidate: cache.revalidate,
-              status,
-              timestamp: startTime
-            });
-          }
-        }
-      },
-      (err) => {
-        const failedEntry = {
-          ...entry,
-          state: "failed",
-          error: err?.message || "Network request failed",
-          response: {
-            status: 0,
-            statusText: "FETCH_ERROR",
-            headers: {},
-            durationMs: performance.now() - t0
-          }
-        };
-        recordSsrTrace(failedEntry);
-        if (broadcaster.hasListeners()) {
-          broadcaster.broadcast(failedEntry);
-        }
-        void writeTraceCookie(failedEntry);
+      };
+      recordSsrTrace(completedEntry);
+      if (broadcaster.hasListeners()) {
+        broadcaster.broadcast(completedEntry);
       }
-    );
-    return promise;
+      await writeTraceCookie(completedEntry);
+      const cache = isCacheable(init);
+      if (cache) {
+        const header = response.headers.get("x-nextjs-cache");
+        const status = header === "HIT" || header === "MISS" || header === "STALE" ? header : ttfbMs < 2 ? "HIT" : "MISS";
+        if (broadcaster.hasListeners()) {
+          broadcaster.broadcast({
+            id: genId("cch"),
+            category: "cache",
+            key: `${method} ${url}`,
+            url,
+            tags: cache.tags,
+            revalidate: cache.revalidate,
+            status,
+            timestamp: startTime
+          });
+        }
+      }
+      return response;
+    } catch (err) {
+      const failedEntry = {
+        ...entry,
+        state: "failed",
+        error: err?.message || "Network request failed",
+        response: {
+          status: 0,
+          statusText: "FETCH_ERROR",
+          headers: {},
+          durationMs: performance.now() - t0
+        }
+      };
+      recordSsrTrace(failedEntry);
+      if (broadcaster.hasListeners()) {
+        broadcaster.broadcast(failedEntry);
+      }
+      await writeTraceCookie(failedEntry);
+      throw err;
+    }
   };
   Object.defineProperty(wrapped, DEVTOOLS_FETCH, { value: true });
   return wrapped;
 }
 function registerNextDevTools() {
+  void getNextHeaders();
   const g3 = globalThis;
   if (g3[PATCHED] || typeof g3.fetch !== "function") return;
   g3[PATCHED] = true;

@@ -120,7 +120,7 @@ export async function writeTraceCookie(entry: NetworkEntry): Promise<void> {
 }
 
 function wrapFetch(original: FetchFn): FetchFn {
-  const wrapped = function devtoolsFetch(this: unknown, ...args: Parameters<FetchFn>): Promise<Response> {
+  const wrapped = async function devtoolsFetch(this: unknown, ...args: Parameters<FetchFn>): Promise<Response> {
     // If we are already executing inside a devtoolsFetch call on this async stack, pass through directly
     if (fetchContext.getStore()) {
       return original.apply(this, args);
@@ -157,106 +157,106 @@ function wrapFetch(original: FetchFn): FetchFn {
       broadcaster.broadcast(entry);
     }
 
-    const promise = fetchContext.run(true, () => original.apply(this, args));
-    trackInFlightFetch(promise);
+    const rawPromise = fetchContext.run(true, () => original.apply(this, args));
+    trackInFlightFetch(rawPromise);
 
-    // Observe in the background so the caller promise is returned untouched.
-    promise.then(
-      async (response) => {
-        const ttfbMs = performance.now() - t0;
-        const clone = safeClone(response);
-        const tBody = performance.now();
-        const [captured, reqBody] = await Promise.all([
-          clone ? captureResponseBody(clone) : Promise.resolve(null),
-          reqClone ? reqClone.text().catch(() => null) : Promise.resolve(null),
-        ]);
-        const now = performance.now();
-        const request = reqBody != null ? { ...entry.request, body: reqBody } : entry.request;
+    try {
+      const response = await rawPromise;
+      const ttfbMs = performance.now() - t0;
+      const clone = safeClone(response);
+      const tBody = performance.now();
+      const [captured, reqBody] = await Promise.all([
+        clone ? captureResponseBody(clone) : Promise.resolve(null),
+        reqClone ? reqClone.text().catch(() => null) : Promise.resolve(null),
+      ]);
+      const now = performance.now();
+      const request = reqBody != null ? { ...entry.request, body: reqBody } : entry.request;
 
-        const completedEntry: NetworkEntry = {
-          ...entry,
-          request,
-          state: "completed",
-          response: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: headersToObject(response.headers),
-            body: captured?.body ?? null,
-            bodyEncoding: captured?.encoding,
-            bodyTruncated: captured?.truncated,
-            contentType: captured?.contentType,
-            size: captured?.size,
-            durationMs: now - t0,
-            ttfbMs,
-            downloadMs: now - tBody,
-          },
-        };
+      const completedEntry: NetworkEntry = {
+        ...entry,
+        request,
+        state: "completed",
+        response: {
+          status: response.status,
+          statusText: response.statusText,
+          headers: headersToObject(response.headers),
+          body: captured?.body ?? null,
+          bodyEncoding: captured?.encoding,
+          bodyTruncated: captured?.truncated,
+          contentType: captured?.contentType,
+          size: captured?.size,
+          durationMs: now - t0,
+          ttfbMs,
+          downloadMs: now - tBody,
+        },
+      };
 
-        recordSsrTrace(completedEntry);
+      recordSsrTrace(completedEntry);
+      if (broadcaster.hasListeners()) {
+        broadcaster.broadcast(completedEntry);
+      }
+
+      // Synchronously write trace cookie before Server Action / function returns
+      await writeTraceCookie(completedEntry);
+
+      const cache = isCacheable(init);
+      if (cache) {
+        const header = response.headers.get("x-nextjs-cache");
+        // Heuristic: Next data cache answers without touching the network.
+        const status: CacheEntry["status"] =
+          header === "HIT" || header === "MISS" || header === "STALE"
+            ? header
+            : ttfbMs < 2
+              ? "HIT"
+              : "MISS";
         if (broadcaster.hasListeners()) {
-          broadcaster.broadcast(completedEntry);
+          broadcaster.broadcast({
+            id: genId("cch"),
+            category: "cache",
+            key: `${method} ${url}`,
+            url,
+            tags: cache.tags,
+            revalidate: cache.revalidate,
+            status,
+            timestamp: startTime,
+          });
         }
+      }
 
-        // Bridge serverless traces to client via ephemeral cookie (Solution 1)
-        void writeTraceCookie(completedEntry);
+      return response;
+    } catch (err: unknown) {
+      const failedEntry: NetworkEntry = {
+        ...entry,
+        state: "failed",
+        error: (err as Error)?.message || "Network request failed",
+        response: {
+          status: 0,
+          statusText: "FETCH_ERROR",
+          headers: {},
+          durationMs: performance.now() - t0,
+        },
+      };
 
-        const cache = isCacheable(init);
-        if (cache) {
-          const header = response.headers.get("x-nextjs-cache");
-          // Heuristic: Next data cache answers without touching the network.
-          const status: CacheEntry["status"] =
-            header === "HIT" || header === "MISS" || header === "STALE"
-              ? header
-              : ttfbMs < 2
-                ? "HIT"
-                : "MISS";
-          if (broadcaster.hasListeners()) {
-            broadcaster.broadcast({
-              id: genId("cch"),
-              category: "cache",
-              key: `${method} ${url}`,
-              url,
-              tags: cache.tags,
-              revalidate: cache.revalidate,
-              status,
-              timestamp: startTime,
-            });
-          }
-        }
-      },
-      (err: unknown) => {
-        const failedEntry: NetworkEntry = {
-          ...entry,
-          state: "failed",
-          error: (err as Error)?.message || "Network request failed",
-          response: {
-            status: 0,
-            statusText: "FETCH_ERROR",
-            headers: {},
-            durationMs: performance.now() - t0,
-          },
-        };
+      recordSsrTrace(failedEntry);
+      if (broadcaster.hasListeners()) {
+        broadcaster.broadcast(failedEntry);
+      }
 
-        recordSsrTrace(failedEntry);
-        if (broadcaster.hasListeners()) {
-          broadcaster.broadcast(failedEntry);
-        }
-
-        // Bridge serverless traces to client via ephemeral cookie (Solution 1)
-        void writeTraceCookie(failedEntry);
-      },
-    );
-    return promise;
+      await writeTraceCookie(failedEntry);
+      throw err;
+    }
   } as FetchFn;
   Object.defineProperty(wrapped, DEVTOOLS_FETCH, { value: true });
   return wrapped;
 }
 
 export function registerNextDevTools(): void {
+  // Preload next/headers early
+  void getNextHeaders();
+
   const g = globalThis as unknown as Record<symbol, boolean | undefined> & { fetch?: FetchFn };
   if (g[PATCHED] || typeof g.fetch !== "function") return;
   g[PATCHED] = true;
-
 
   let current: FetchFn = g.fetch;
   const rewrap = (fn: FetchFn): FetchFn => {

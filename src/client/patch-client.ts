@@ -111,7 +111,9 @@ function observe(
 
       // Drain any server traces transported via ephemeral cookies
       drainTraceCookies(emit);
-      setTimeout(() => drainTraceCookies(emit), 30);
+      setTimeout(() => drainTraceCookies(emit), 20);
+      setTimeout(() => drainTraceCookies(emit), 100);
+      setTimeout(() => drainTraceCookies(emit), 300);
     },
     (err: unknown) => {
       const message = (err as Error)?.message || "Client fetch failed";
@@ -128,7 +130,9 @@ function observe(
       }
 
       drainTraceCookies(emit);
-      setTimeout(() => drainTraceCookies(emit), 30);
+      setTimeout(() => drainTraceCookies(emit), 20);
+      setTimeout(() => drainTraceCookies(emit), 100);
+      setTimeout(() => drainTraceCookies(emit), 300);
     },
   );
 }
