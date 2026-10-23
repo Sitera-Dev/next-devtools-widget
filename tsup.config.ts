@@ -1,34 +1,43 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
 
 const common = {
-  format: ['esm', 'cjs'] as ('esm' | 'cjs')[],
+  format: ["esm", "cjs"] as ("esm" | "cjs")[],
   dts: true,
   sourcemap: true,
-  clean: false, // dist is wiped by the `build` script (two parallel configs would race)
-  target: 'es2020',
-  external: ['next', /^next\/.*/, 'react', 'react-dom', 'react/jsx-runtime'],
+  clean: false,
+  target: "es2020",
+  external: ["next", /^next\/.*/, "react", "react-dom", "react/jsx-runtime"],
   minify: false,
 };
 
 export default defineConfig([
   {
     ...common,
-    entry: { index: 'src/index.ts' },
-    // The widget is a Client Component; esbuild strips module directives, so re-add it.
+    entry: { client: "src/client/index.ts" },
     banner: { js: "'use client';" },
   },
   {
     ...common,
+    entry: { index: "src/index.tsx" },
+    external: [
+      ...common.external,
+      "./client",
+      "./client.js",
+      "./client.mjs",
+    ],
+  },
+  {
+    ...common,
     entry: {
-      server: 'src/server/index.ts',
-      'server/route': 'src/server/route-handler.ts',
+      server: "src/server/index.ts",
+      "server/route": "src/server/route-handler.ts",
     },
   },
   {
-    format: ['cjs'],
-    target: 'node18',
-    entry: { cli: 'src/cli.ts' },
-    banner: { js: '#!/usr/bin/env node' },
+    format: ["cjs"],
+    target: "node18",
+    entry: { cli: "src/cli.ts" },
+    banner: { js: "#!/usr/bin/env node" },
     clean: false,
     minify: false,
     dts: false,

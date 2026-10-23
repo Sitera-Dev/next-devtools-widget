@@ -27,6 +27,16 @@
         "default": "./dist/index.js"
       }
     },
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.mts",
+        "default": "./dist/client.mjs"
+      },
+      "require": {
+        "types": "./dist/client.d.ts",
+        "default": "./dist/client.js"
+      }
+    },
     "./server": {
       "import": {
         "types": "./dist/server.d.mts",

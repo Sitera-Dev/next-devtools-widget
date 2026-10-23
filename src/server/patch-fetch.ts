@@ -1,3 +1,4 @@
+import { recordSsrTrace, trackInFlightFetch } from './ssr-store';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { broadcaster } from "./event-broadcaster";
 import type { CacheEntry, NetworkEntry } from "../shared/types";
@@ -157,6 +158,7 @@ function wrapFetch(original: FetchFn): FetchFn {
     }
 
     const promise = fetchContext.run(true, () => original.apply(this, args));
+    trackInFlightFetch(promise);
 
     // Observe in the background so the caller promise is returned untouched.
     promise.then(
@@ -190,6 +192,7 @@ function wrapFetch(original: FetchFn): FetchFn {
           },
         };
 
+        recordSsrTrace(completedEntry);
         if (broadcaster.hasListeners()) {
           broadcaster.broadcast(completedEntry);
         }
@@ -234,6 +237,7 @@ function wrapFetch(original: FetchFn): FetchFn {
           },
         };
 
+        recordSsrTrace(failedEntry);
         if (broadcaster.hasListeners()) {
           broadcaster.broadcast(failedEntry);
         }

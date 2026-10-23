@@ -1,3 +1,4 @@
+import { setupSsrObserver } from './ssr-drainer';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RedactRule } from '../shared/types';
 import { DEFAULT_REDACT } from '../shared/utils';
@@ -140,7 +141,9 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
   }, [maxEntries]);
   useEffect(() => {
     void store.hydrate();
-    return connectSse();
+    const unsubSsr = setupSsrObserver(store.upsert);
+    const unsubSse = connectSse();
+    return () => { unsubSsr(); unsubSse(); };
   }, []);
 
   // ---- Server trace cookie transport (serverless / Vercel Lambda bridge) ----
@@ -422,3 +425,5 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
     </RedactContext.Provider>
   );
 }
+
+export { NextDevTools as NextDevToolsClient };
