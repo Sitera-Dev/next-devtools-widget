@@ -1,0 +1,21 @@
+{
+  "name": "next-devtools-playground",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build"
+  },
+  "dependencies": {
+    "@sitera-dev/next-devtools": "file:sitera-dev-next-devtools-1.0.0.tgz",
+    "next": "^16",
+    "next-devtools": "file:next-devtools-1.0.0.tgz",
+    "next-devtools-widget": "file:next-devtools-widget-1.0.0.tgz",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "typescript": "^5"
+  }
+}

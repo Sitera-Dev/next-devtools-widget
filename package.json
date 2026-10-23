@@ -1,0 +1,73 @@
+{
+  "name": "next-devtools-widget",
+  "version": "1.0.0",
+  "description": "Zero-config in-app floating DevTools for Next.js: Network, Server Actions, Cache and System inspector.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sitera-Dev/next-devtools-widget.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "next-devtools-widget": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server.d.mts",
+        "default": "./dist/server.mjs"
+      },
+      "require": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      }
+    },
+    "./server/route": {
+      "import": {
+        "types": "./dist/server/route.d.mts",
+        "default": "./dist/server/route.mjs"
+      },
+      "require": {
+        "types": "./dist/server/route.d.ts",
+        "default": "./dist/server/route.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup && chmod +x dist/cli.js",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "react": "^19",
+    "react-dom": "^19",
+    "tsup": "^8",
+    "typescript": "^5",
+    "vitest": "^3"
+  }
+}

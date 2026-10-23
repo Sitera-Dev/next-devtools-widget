@@ -1,0 +1,6 @@
+/* Deliberately hostile global styles: none of this may leak into the devtools widget. */
+* { font-family: 'Comic Sans MS', cursive !important; }
+button { background: tomato !important; color: yellow !important; border: 4px dashed purple !important; padding: 12px !important; }
+input, select { background: lime !important; }
+mark { background: pink !important; }
+body { margin: 0; padding: 24px; background: #fffbe6; }
