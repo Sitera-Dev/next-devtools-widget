@@ -86,7 +86,7 @@ function createStore() {
           for (const item of stored) {
             const e =
               item.category === 'network' && item.origin === 'client' && item.state === 'pending'
-                ? { ...item, state: 'failed', error: 'Interrupted (page reloaded)' }
+                ? { ...item, state: 'failed' as const, error: 'Interrupted (page reloaded)' }
                 : item;
             byId.set(e.id, e);
           }

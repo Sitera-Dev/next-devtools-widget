@@ -10,6 +10,7 @@ import { SystemTab } from './components/tabs/system-tab';
 import { TriggerButton } from './components/trigger-button';
 import { RedactContext, useLocalStorage } from './components/ui';
 import { setupClientFetchProxy } from './patch-client';
+import { drainTraceCookies } from './cookie-transport';
 import { ShadowWrapper, type Theme } from './shadow-wrapper';
 import { connectSse } from './sse-client';
 import { store, useDevToolsState } from './store';
@@ -140,6 +141,25 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
   useEffect(() => {
     void store.hydrate();
     return connectSse();
+  }, []);
+
+  // ---- Server trace cookie transport (serverless / Vercel Lambda bridge) ----
+  useEffect(() => {
+    drainTraceCookies(store.upsert);
+    const interval = setInterval(() => drainTraceCookies(store.upsert), 1000);
+    const onFocus = () => drainTraceCookies(store.upsert);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") drainTraceCookies(store.upsert);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const counts = useMemo(() => {

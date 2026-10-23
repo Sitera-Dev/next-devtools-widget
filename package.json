@@ -52,7 +52,7 @@
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup && chmod +x dist/cli.js",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node --expose-gc ./node_modules/vitest/vitest.mjs run",
     "prepublishOnly": "npm run build && npm test"
   },
   "peerDependencies": {

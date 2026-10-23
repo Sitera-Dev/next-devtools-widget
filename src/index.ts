@@ -9,3 +9,4 @@ export type {
   SystemInfo,
   RedactRule,
 } from './shared/types';
+export { drainTraceCookies } from './client/cookie-transport';

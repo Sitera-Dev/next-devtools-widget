@@ -6,7 +6,7 @@ const common = {
   sourcemap: true,
   clean: false, // dist is wiped by the `build` script (two parallel configs would race)
   target: 'es2020',
-  external: ['next', 'react', 'react-dom', 'react/jsx-runtime'],
+  external: ['next', /^next\/.*/, 'react', 'react-dom', 'react/jsx-runtime'],
   minify: false,
 };
 

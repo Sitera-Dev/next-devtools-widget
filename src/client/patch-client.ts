@@ -1,4 +1,4 @@
-import type { ActionEntry, DevToolsEntry, NetworkEntry } from '../shared/types';
+import type { ActionEntry, DevToolsEntry, NetworkEntry } from "../shared/types";
 import {
   captureResponseBody,
   describeBody,
@@ -9,9 +9,10 @@ import {
   headersToObject,
   isInternalRequest,
   safeClone,
-} from '../shared/utils';
+} from "../shared/utils";
+import { drainTraceCookies } from "./cookie-transport";
 
-const PATCHED = '__NEXT_DEVTOOLS_FETCH_PATCHED__';
+const PATCHED = "__NEXT_DEVTOOLS_FETCH_PATCHED__";
 
 type FetchFn = typeof fetch;
 
@@ -20,12 +21,12 @@ type FetchFn = typeof fetch;
  *
  * Rules (violating any of them breaks the Next.js router):
  *  - arguments are forwarded untouched, the caller gets the *original* promise back;
- *  - Next.js internals (`/_next/*`, HMR, RSC prefetch, devtools SSE) are never inspected;
- *  - nothing is assumed about `input` (Request-likes with undefined `method` exist).
+ *  - Next.js internals (/_next/*, HMR, RSC prefetch, devtools SSE) are never inspected;
+ *  - nothing is assumed about input (Request-likes with undefined method exist).
  */
 export function setupClientFetchProxy(emit: (entry: DevToolsEntry) => void): void {
   const w = window as unknown as Record<string, unknown> & { fetch?: FetchFn };
-  if (typeof w.fetch !== 'function' || w[PATCHED] || (w.fetch as any)[PATCHED]) return;
+  if (typeof w.fetch !== "function" || w[PATCHED] || (w.fetch as any)[PATCHED]) return;
   w[PATCHED] = true;
 
   const originalFetch: FetchFn = w.fetch;
@@ -57,17 +58,17 @@ function observe(
   const startTime = Date.now();
   // The call already started; keep the clock as close to it as possible.
   const t0 = performance.now();
-  const actionId = headers['next-action'];
-  const id = genId(actionId ? 'act' : 'cli');
+  const actionId = headers["next-action"];
+  const id = genId(actionId ? "act" : "cli");
   const request = { url, method, headers, ...describeBody(init?.body), timestamp: startTime };
 
-  const entry: NetworkEntry = { id, category: 'network', origin: 'client', state: 'pending', request };
+  const entry: NetworkEntry = { id, category: "network", origin: "client", state: "pending", request };
   emit(entry);
 
-  const actionBase = (): Omit<ActionEntry, 'durationMs'> => ({
+  const actionBase = (): Omit<ActionEntry, "durationMs"> => ({
     id: `act_${id}`,
-    category: 'action',
-    origin: 'client',
+    category: "action",
+    origin: "client",
     actionName: `Server Action ${actionId!.slice(0, 8)}`,
     args: [request.body ?? request.bodyForm ?? request.bodyNote ?? null],
     timestamp: startTime,
@@ -83,7 +84,7 @@ function observe(
 
       emit({
         ...entry,
-        state: 'completed',
+        state: "completed",
         response: {
           status: response.status,
           statusText: response.statusText,
@@ -107,20 +108,27 @@ function observe(
           durationMs: now - t0,
         });
       }
+
+      // Drain any server traces transported via ephemeral cookies
+      drainTraceCookies(emit);
+      setTimeout(() => drainTraceCookies(emit), 30);
     },
     (err: unknown) => {
-      const message = (err as Error)?.message || 'Client fetch failed';
+      const message = (err as Error)?.message || "Client fetch failed";
 
       emit({
         ...entry,
-        state: 'failed',
-        error: (err as Error)?.name === 'AbortError' ? 'Aborted' : message,
-        response: { status: 0, statusText: 'CLIENT_ERROR', headers: {}, durationMs: performance.now() - t0 },
+        state: "failed",
+        error: (err as Error)?.name === "AbortError" ? "Aborted" : message,
+        response: { status: 0, statusText: "CLIENT_ERROR", headers: {}, durationMs: performance.now() - t0 },
       });
 
       if (actionId) {
         emit({ ...actionBase(), error: message, durationMs: performance.now() - t0 });
       }
+
+      drainTraceCookies(emit);
+      setTimeout(() => drainTraceCookies(emit), 30);
     },
   );
 }
