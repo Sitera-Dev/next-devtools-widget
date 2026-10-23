@@ -19,11 +19,16 @@ export default defineConfig([
   {
     ...common,
     entry: { index: "src/index.tsx" },
-    external: [
-      ...common.external,
-      "./client",
-      "./client.js",
-      "./client.mjs",
+    esbuildPlugins: [
+      {
+        name: "rewrite-client-ext",
+        setup(build) {
+          build.onResolve({ filter: /^\.\/client$/ }, (args) => {
+            const isEsm = build.initialOptions.format === "esm";
+            return { path: isEsm ? "./client.mjs" : "./client.js", external: true };
+          });
+        },
+      },
     ],
   },
   {

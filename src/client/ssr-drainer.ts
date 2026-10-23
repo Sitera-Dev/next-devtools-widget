@@ -5,23 +5,38 @@ export const SSR_SCRIPT_ID = "__next_devtools_ssr__";
 export function drainSsrTraces(emit: (entry: DevToolsEntry) => void): void {
   if (typeof document === "undefined") return;
 
-  const el = document.getElementById(SSR_SCRIPT_ID);
-  if (!el || !el.textContent) return;
+  const elements: { textContent: string | null; remove: () => void }[] = [];
 
-  try {
-    const traces = JSON.parse(el.textContent);
-    if (Array.isArray(traces)) {
-      for (const entry of traces) {
-        if (entry && typeof entry === "object" && entry.id && entry.category) {
-          emit(entry);
+  if (typeof document.querySelectorAll === "function") {
+    document
+      .querySelectorAll(`#${SSR_SCRIPT_ID}, [data-next-devtools-ssr]`)
+      .forEach((el) => elements.push(el as any));
+  } else if (typeof document.getElementById === "function") {
+    const el = document.getElementById(SSR_SCRIPT_ID);
+    if (el) elements.push(el as any);
+  }
+
+  if (elements.length === 0) return;
+
+  elements.forEach((el) => {
+    try {
+      const content = el.textContent;
+      if (content) {
+        const traces = JSON.parse(content);
+        if (Array.isArray(traces)) {
+          for (const entry of traces) {
+            if (entry && typeof entry === "object" && entry.id && entry.category) {
+              emit(entry);
+            }
+          }
         }
       }
+    } catch {
+      // Malformed JSON, ignore
+    } finally {
+      el.remove();
     }
-  } catch {
-    // Malformed JSON, ignore
-  } finally {
-    el.remove();
-  }
+  });
 }
 
 /**
@@ -39,8 +54,18 @@ export function setupSsrObserver(emit: (entry: DevToolsEntry) => void): () => vo
     return () => {};
   }
 
+  const hasScript = () => {
+    if (typeof document.querySelector === "function") {
+      return !!document.querySelector(`#${SSR_SCRIPT_ID}, [data-next-devtools-ssr]`);
+    }
+    if (typeof document.getElementById === "function") {
+      return !!document.getElementById(SSR_SCRIPT_ID);
+    }
+    return false;
+  };
+
   const observer = new MutationObserver(() => {
-    if (document.getElementById(SSR_SCRIPT_ID)) {
+    if (hasScript()) {
       drainSsrTraces(emit);
     }
   });

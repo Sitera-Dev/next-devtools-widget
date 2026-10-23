@@ -74,10 +74,16 @@ function getRecentSsrTraces() {
 async function waitForSsrTraces(timeoutMs = 1500) {
   const s = getStore();
   const deadline = Date.now() + timeoutMs;
-  while (s.inFlight.size > 0 && Date.now() < deadline) {
+  while (Date.now() < deadline) {
+    if (s.inFlight.size === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      if (s.inFlight.size === 0) {
+        break;
+      }
+    }
     await Promise.race([
       Promise.all(Array.from(s.inFlight)),
-      new Promise((resolve) => setTimeout(resolve, 20))
+      new Promise((resolve) => setTimeout(resolve, 25))
     ]);
   }
   return s.buffer.slice();

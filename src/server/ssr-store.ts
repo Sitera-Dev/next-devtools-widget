@@ -49,10 +49,20 @@ export async function waitForSsrTraces(timeoutMs = 1500): Promise<NetworkEntry[]
   const s = getStore();
   const deadline = Date.now() + timeoutMs;
 
-  while (s.inFlight.size > 0 && Date.now() < deadline) {
+  while (Date.now() < deadline) {
+    if (s.inFlight.size === 0) {
+      // Allow a brief grace period (30ms) for concurrent Server Components
+      // (e.g. after `await connection()`, `await cookies()`, or dynamic imports)
+      // to start their fetch calls, or for chained fetches to start.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      if (s.inFlight.size === 0) {
+        break;
+      }
+    }
+
     await Promise.race([
       Promise.all(Array.from(s.inFlight)),
-      new Promise((resolve) => setTimeout(resolve, 20)),
+      new Promise((resolve) => setTimeout(resolve, 25)),
     ]);
   }
 

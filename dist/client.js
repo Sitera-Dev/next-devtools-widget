@@ -32,7 +32,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var client_exports = {};
 __export(client_exports, {
   NextDevTools: () => NextDevTools,
-  NextDevToolsClient: () => NextDevTools
+  NextDevToolsClient: () => NextDevTools,
+  drainSsrTraces: () => drainSsrTraces,
+  drainTraceCookies: () => drainTraceCookies,
+  setupSsrObserver: () => setupSsrObserver
 });
 module.exports = __toCommonJS(client_exports);
 
@@ -40,21 +43,32 @@ module.exports = __toCommonJS(client_exports);
 var SSR_SCRIPT_ID = "__next_devtools_ssr__";
 function drainSsrTraces(emit) {
   if (typeof document === "undefined") return;
-  const el = document.getElementById(SSR_SCRIPT_ID);
-  if (!el || !el.textContent) return;
-  try {
-    const traces = JSON.parse(el.textContent);
-    if (Array.isArray(traces)) {
-      for (const entry of traces) {
-        if (entry && typeof entry === "object" && entry.id && entry.category) {
-          emit(entry);
+  const elements = [];
+  if (typeof document.querySelectorAll === "function") {
+    document.querySelectorAll(`#${SSR_SCRIPT_ID}, [data-next-devtools-ssr]`).forEach((el) => elements.push(el));
+  } else if (typeof document.getElementById === "function") {
+    const el = document.getElementById(SSR_SCRIPT_ID);
+    if (el) elements.push(el);
+  }
+  if (elements.length === 0) return;
+  elements.forEach((el) => {
+    try {
+      const content = el.textContent;
+      if (content) {
+        const traces = JSON.parse(content);
+        if (Array.isArray(traces)) {
+          for (const entry of traces) {
+            if (entry && typeof entry === "object" && entry.id && entry.category) {
+              emit(entry);
+            }
+          }
         }
       }
+    } catch {
+    } finally {
+      el.remove();
     }
-  } catch {
-  } finally {
-    el.remove();
-  }
+  });
 }
 function setupSsrObserver(emit) {
   if (typeof document === "undefined") {
@@ -66,8 +80,17 @@ function setupSsrObserver(emit) {
     return () => {
     };
   }
+  const hasScript = () => {
+    if (typeof document.querySelector === "function") {
+      return !!document.querySelector(`#${SSR_SCRIPT_ID}, [data-next-devtools-ssr]`);
+    }
+    if (typeof document.getElementById === "function") {
+      return !!document.getElementById(SSR_SCRIPT_ID);
+    }
+    return false;
+  };
   const observer = new MutationObserver(() => {
-    if (document.getElementById(SSR_SCRIPT_ID)) {
+    if (hasScript()) {
       drainSsrTraces(emit);
     }
   });
@@ -2617,6 +2640,9 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   NextDevTools,
-  NextDevToolsClient
+  NextDevToolsClient,
+  drainSsrTraces,
+  drainTraceCookies,
+  setupSsrObserver
 });
 //# sourceMappingURL=client.js.map
