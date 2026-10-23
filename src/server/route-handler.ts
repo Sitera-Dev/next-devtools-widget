@@ -6,7 +6,8 @@ import { getSystemInfo } from './system-info';
 
 export async function GET(request: Request): Promise<Response> {
   // Streams request/response bodies, so it must never be reachable in production by accident.
-  if (process.env.NODE_ENV === 'production' && process.env.NEXT_DEVTOOLS_ENABLED !== 'true') {
+  const isAllowedInProd = process.env.NEXT_DEVTOOLS_ENABLED === 'true' || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === 'true';
+  if (process.env.NODE_ENV === 'production' && !isAllowedInProd) {
     return new Response('Not Found', { status: 404 });
   }
 

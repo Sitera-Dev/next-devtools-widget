@@ -32,7 +32,7 @@ export interface NextDevToolsProps {
 
 // Patch as early as possible (module evaluation, before any effect runs) so no early fetch is missed.
 // Recording is switched off in <NextDevTools enabled={false} />.
-if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+if (typeof window !== 'undefined') {
   setupClientFetchProxy(store.upsert);
 }
 
@@ -87,11 +87,12 @@ export function NextDevTools({
   maxEntries = 200,
   redact = DEFAULT_REDACT,
   tabs = ALL_TABS,
-  enabled = process.env.NODE_ENV === 'development',
+  enabled = process.env.NODE_ENV === 'development' || process.env.NEXT_DEVTOOLS_ENABLED === 'true' || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === 'true',
 }: NextDevToolsProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
+    if (typeof window !== 'undefined') setupClientFetchProxy(store.upsert);
     store.setRecording(enabled);
   }, [enabled]);
 
