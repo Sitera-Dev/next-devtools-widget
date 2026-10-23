@@ -1694,15 +1694,16 @@ async function decompressDeflate(str) {
   }
   throw new Error("DecompressionStream unavailable");
 }
-async function parseCookieValue(val) {
+async function parseCookieValue(rawVal) {
   try {
+    const val = decodeURIComponent(rawVal);
     let jsonString = "";
     if (val.startsWith("z:")) {
       jsonString = await decompressDeflate(val.slice(2));
     } else if (val.startsWith("b:")) {
       jsonString = decodeB64(val.slice(2));
     } else {
-      jsonString = decodeURIComponent(val);
+      jsonString = val;
     }
     const entry = JSON.parse(jsonString);
     if (entry && typeof entry === "object" && entry.id && entry.category) {
@@ -1734,13 +1735,14 @@ function drainTraceCookies(emit) {
     const val = trimmed.slice(eqIdx + 1).trim();
     expireCookie(name);
     try {
-      if (val.startsWith("z:")) {
-        void parseCookieValue(val).then((entry) => {
+      const decodedVal = decodeURIComponent(val);
+      if (decodedVal.startsWith("z:")) {
+        void parseCookieValue(decodedVal).then((entry) => {
           if (entry) emit(entry);
         }).catch(() => {
         });
       } else {
-        const jsonString = val.startsWith("b:") ? decodeB64(val.slice(2)) : decodeURIComponent(val);
+        const jsonString = decodedVal.startsWith("b:") ? decodeB64(decodedVal.slice(2)) : decodedVal;
         const entry = JSON.parse(jsonString);
         if (entry && typeof entry === "object" && entry.id && entry.category) {
           emit(entry);

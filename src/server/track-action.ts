@@ -13,11 +13,26 @@ function isDevToolsActive(): boolean {
   );
 }
 
-let nextHeadersPromise: Promise<typeof import('next/headers') | null> | null = null;
-function getNextHeaders(): Promise<typeof import('next/headers') | null> {
-  if (!nextHeadersPromise) {
-    nextHeadersPromise = import('next/headers').catch(() => null);
-  }
+let nextHeadersPromise: Promise<typeof import("next/headers") | null> | null = null;
+function getNextHeaders(): Promise<typeof import("next/headers") | null> {
+  if (nextHeadersPromise) return nextHeadersPromise;
+  nextHeadersPromise = (async () => {
+    try {
+      if (typeof require !== "undefined") {
+        const mod = require("next/headers");
+        if (mod && typeof mod.cookies === "function") return mod;
+      }
+    } catch {}
+    try {
+      const mod = await import("next/headers.js");
+      if (mod && typeof mod.cookies === "function") return mod;
+    } catch {}
+    try {
+      const mod = await import("next/headers");
+      if (mod && typeof mod.cookies === "function") return mod;
+    } catch {}
+    return null;
+  })();
   return nextHeadersPromise;
 }
 

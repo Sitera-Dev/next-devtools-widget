@@ -43,8 +43,9 @@ async function decompressDeflate(str: string): Promise<string> {
   throw new Error("DecompressionStream unavailable");
 }
 
-export async function parseCookieValue(val: string): Promise<DevToolsEntry | null> {
+export async function parseCookieValue(rawVal: string): Promise<DevToolsEntry | null> {
   try {
+    const val = decodeURIComponent(rawVal);
     let jsonString = "";
     if (val.startsWith("z:")) {
       jsonString = await decompressDeflate(val.slice(2));
@@ -52,7 +53,7 @@ export async function parseCookieValue(val: string): Promise<DevToolsEntry | nul
       jsonString = decodeB64(val.slice(2));
     } else {
       // Legacy URI-encoded format
-      jsonString = decodeURIComponent(val);
+      jsonString = val;
     }
 
     const entry = JSON.parse(jsonString) as DevToolsEntry;
@@ -100,16 +101,17 @@ export function drainTraceCookies(emit: (entry: DevToolsEntry) => void): void {
     expireCookie(name);
 
     try {
-      if (val.startsWith("z:")) {
+      const decodedVal = decodeURIComponent(val);
+      if (decodedVal.startsWith("z:")) {
         // Async decompression for deflated payloads
-        void parseCookieValue(val)
+        void parseCookieValue(decodedVal)
           .then((entry) => {
             if (entry) emit(entry);
           })
           .catch(() => {});
       } else {
         // Synchronous decoding for base64url or legacy URI-encoded format
-        const jsonString = val.startsWith("b:") ? decodeB64(val.slice(2)) : decodeURIComponent(val);
+        const jsonString = decodedVal.startsWith("b:") ? decodeB64(decodedVal.slice(2)) : decodedVal;
         const entry = JSON.parse(jsonString) as DevToolsEntry;
         if (entry && typeof entry === "object" && entry.id && entry.category) {
           emit(entry);

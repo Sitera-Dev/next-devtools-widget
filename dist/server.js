@@ -301,9 +301,27 @@ function isDevToolsActive() {
 }
 var nextHeadersPromise = null;
 function getNextHeaders() {
-  if (!nextHeadersPromise) {
-    nextHeadersPromise = import("next/headers").catch(() => null);
-  }
+  if (nextHeadersPromise) return nextHeadersPromise;
+  nextHeadersPromise = (async () => {
+    try {
+      if (typeof require !== "undefined") {
+        const mod = require("next/headers");
+        if (mod && typeof mod.cookies === "function") return mod;
+      }
+    } catch {
+    }
+    try {
+      const mod = await import("next/headers.js");
+      if (mod && typeof mod.cookies === "function") return mod;
+    } catch {
+    }
+    try {
+      const mod = await import("next/headers");
+      if (mod && typeof mod.cookies === "function") return mod;
+    } catch {
+    }
+    return null;
+  })();
   return nextHeadersPromise;
 }
 function encodeTracePayload(payload) {
@@ -361,8 +379,8 @@ async function writeTraceCookie(entry) {
       };
       encoded = encodeTracePayload(minimalPayload);
     }
-    const slot = Math.floor(Math.random() * 4);
-    const cookieName = `${TRACE_COOKIE_PREFIX}${slot}`;
+    const suffix = entry.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(-8);
+    const cookieName = `${TRACE_COOKIE_PREFIX}${suffix}`;
     const isProd = process.env.NODE_ENV === "production";
     cookieJar.set(cookieName, encoded, {
       path: "/",
@@ -519,9 +537,27 @@ function isDevToolsActive2() {
 }
 var nextHeadersPromise2 = null;
 function getNextHeaders2() {
-  if (!nextHeadersPromise2) {
-    nextHeadersPromise2 = import("next/headers").catch(() => null);
-  }
+  if (nextHeadersPromise2) return nextHeadersPromise2;
+  nextHeadersPromise2 = (async () => {
+    try {
+      if (typeof require !== "undefined") {
+        const mod = require("next/headers");
+        if (mod && typeof mod.cookies === "function") return mod;
+      }
+    } catch {
+    }
+    try {
+      const mod = await import("next/headers.js");
+      if (mod && typeof mod.cookies === "function") return mod;
+    } catch {
+    }
+    try {
+      const mod = await import("next/headers");
+      if (mod && typeof mod.cookies === "function") return mod;
+    } catch {
+    }
+    return null;
+  })();
   return nextHeadersPromise2;
 }
 async function writeActionCookie(entry) {

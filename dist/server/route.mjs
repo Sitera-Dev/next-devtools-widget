@@ -1,6 +1,6 @@
 import {
   broadcaster
-} from "../chunk-SG7GSHLZ.mjs";
+} from "../chunk-USJWC5NF.mjs";
 
 // src/server/system-info.ts
 var nextVersion;
