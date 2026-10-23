@@ -1,6 +1,6 @@
 {
   "name": "next-devtools-widget",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-config in-app floating DevTools for Next.js: Network, Server Actions, Cache and System inspector.",
   "license": "MIT",
   "repository": {
