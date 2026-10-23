@@ -81,13 +81,18 @@ export function isInternalUrl(url: string): boolean {
 
 /** Check both URL and headers for Next.js internal router traffic (RSC prefetch/navigation) */
 export function isInternalRequest(url: string, headers?: Record<string, string>): boolean {
+  // CRITICAL: Next.js Server Actions MUST ALWAYS be captured and observed!
+  // In production (e.g. Vercel), Next.js router appends ?_rsc=... to Server Action POST URLs
+  // and adds RSC headers. If 'next-action' header is present, it is NEVER internal traffic!
+  if (headers && headers['next-action']) {
+    return false;
+  }
+
   if (isInternalUrl(url)) return true;
   if (!headers) return false;
-  // Next.js RSC router prefetch / router navigation (unless it's a Server Action)
-  if (!headers['next-action']) {
-    if (headers['rsc'] === '1' || headers['next-router-prefetch'] || headers['next-router-state-tree']) {
-      return true;
-    }
+  // Next.js RSC router prefetch / router navigation
+  if (headers['rsc'] === '1' || headers['next-router-prefetch'] || headers['next-router-state-tree']) {
+    return true;
   }
   return false;
 }

@@ -170,12 +170,13 @@ function isInternalUrl(url) {
   return !url || url.includes("/_next/") || url.includes("/__nextjs") || url.includes("/__devtools") || url.includes("/next-devtools") || url.includes("_rsc=");
 }
 function isInternalRequest(url, headers) {
+  if (headers && headers["next-action"]) {
+    return false;
+  }
   if (isInternalUrl(url)) return true;
   if (!headers) return false;
-  if (!headers["next-action"]) {
-    if (headers["rsc"] === "1" || headers["next-router-prefetch"] || headers["next-router-state-tree"]) {
-      return true;
-    }
+  if (headers["rsc"] === "1" || headers["next-router-prefetch"] || headers["next-router-state-tree"]) {
+    return true;
   }
   return false;
 }
@@ -295,6 +296,7 @@ function isCacheable(init) {
   return null;
 }
 function isDevToolsActive() {
+  if (process.env.NEXT_DEVTOOLS_ENABLED === "false") return false;
   return broadcaster.hasListeners() || process.env.NEXT_DEVTOOLS_ENABLED === "true" || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true" || process.env.NODE_ENV === "development";
 }
 var nextHeadersPromise = null;
@@ -360,10 +362,12 @@ async function writeTraceCookie(entry) {
       encoded = encodeTracePayload(minimalPayload);
     }
     const cookieName = `${TRACE_COOKIE_PREFIX}${entry.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(-12)}`;
+    const isProd = process.env.NODE_ENV === "production";
     cookieJar.set(cookieName, encoded, {
       path: "/",
       maxAge: 60,
       httpOnly: false,
+      secure: isProd,
       sameSite: "lax"
     });
   } catch {

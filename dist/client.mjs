@@ -128,12 +128,13 @@ function isInternalUrl(url) {
   return !url || url.includes("/_next/") || url.includes("/__nextjs") || url.includes("/__devtools") || url.includes("/next-devtools") || url.includes("_rsc=");
 }
 function isInternalRequest(url, headers) {
+  if (headers && headers["next-action"]) {
+    return false;
+  }
   if (isInternalUrl(url)) return true;
   if (!headers) return false;
-  if (!headers["next-action"]) {
-    if (headers["rsc"] === "1" || headers["next-router-prefetch"] || headers["next-router-state-tree"]) {
-      return true;
-    }
+  if (headers["rsc"] === "1" || headers["next-router-prefetch"] || headers["next-router-state-tree"]) {
+    return true;
   }
   return false;
 }
@@ -1813,9 +1814,12 @@ function observe(url, [input, init], headers, promise, emit) {
         });
       }
       drainTraceCookies(emit);
-      setTimeout(() => drainTraceCookies(emit), 20);
-      setTimeout(() => drainTraceCookies(emit), 100);
-      setTimeout(() => drainTraceCookies(emit), 300);
+      setTimeout(() => drainTraceCookies(emit), 10);
+      setTimeout(() => drainTraceCookies(emit), 50);
+      setTimeout(() => drainTraceCookies(emit), 150);
+      setTimeout(() => drainTraceCookies(emit), 350);
+      setTimeout(() => drainTraceCookies(emit), 700);
+      setTimeout(() => drainTraceCookies(emit), 1200);
     },
     (err) => {
       const message = err?.message || "Client fetch failed";
@@ -1829,9 +1833,12 @@ function observe(url, [input, init], headers, promise, emit) {
         emit({ ...actionBase(), error: message, durationMs: performance.now() - t0 });
       }
       drainTraceCookies(emit);
-      setTimeout(() => drainTraceCookies(emit), 20);
-      setTimeout(() => drainTraceCookies(emit), 100);
-      setTimeout(() => drainTraceCookies(emit), 300);
+      setTimeout(() => drainTraceCookies(emit), 10);
+      setTimeout(() => drainTraceCookies(emit), 50);
+      setTimeout(() => drainTraceCookies(emit), 150);
+      setTimeout(() => drainTraceCookies(emit), 350);
+      setTimeout(() => drainTraceCookies(emit), 700);
+      setTimeout(() => drainTraceCookies(emit), 1200);
     }
   );
 }
@@ -2399,17 +2406,25 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
   }, []);
   useEffect5(() => {
     drainTraceCookies(store.upsert);
-    const interval = setInterval(() => drainTraceCookies(store.upsert), 1e3);
+    const interval = setInterval(() => drainTraceCookies(store.upsert), 400);
     const onFocus = () => drainTraceCookies(store.upsert);
     const onVisibility = () => {
       if (document.visibilityState === "visible") drainTraceCookies(store.upsert);
     };
+    const onClick = () => {
+      setTimeout(() => drainTraceCookies(store.upsert), 50);
+      setTimeout(() => drainTraceCookies(store.upsert), 200);
+      setTimeout(() => drainTraceCookies(store.upsert), 500);
+      setTimeout(() => drainTraceCookies(store.upsert), 1e3);
+    };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("click", onClick, { passive: true });
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("click", onClick);
     };
   }, []);
   const counts = useMemo4(() => {

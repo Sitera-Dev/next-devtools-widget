@@ -22,6 +22,7 @@ const PATCHED = Symbol.for("next-devtools.fetch-patched");
 const DEVTOOLS_FETCH = Symbol.for("next-devtools.fetch-wrapped");
 const fetchContext = new AsyncLocalStorage<boolean>();
 
+
 export const TRACE_COOKIE_PREFIX = '__ndt_trace_';
 
 function isCacheable(init: RequestInit | undefined): { tags: string[]; revalidate?: number | false } | null {
@@ -33,6 +34,7 @@ function isCacheable(init: RequestInit | undefined): { tags: string[]; revalidat
 }
 
 function isDevToolsActive(): boolean {
+  if (process.env.NEXT_DEVTOOLS_ENABLED === "false") return false;
   return (
     broadcaster.hasListeners() ||
     process.env.NEXT_DEVTOOLS_ENABLED === "true" ||
@@ -122,10 +124,12 @@ export async function writeTraceCookie(entry: NetworkEntry): Promise<void> {
 
     const cookieName = `${TRACE_COOKIE_PREFIX}${entry.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(-12)}`;
 
+    const isProd = process.env.NODE_ENV === "production";
     cookieJar.set(cookieName, encoded, {
       path: "/",
       maxAge: 60,
       httpOnly: false,
+      secure: isProd,
       sameSite: "lax",
     });
   } catch {

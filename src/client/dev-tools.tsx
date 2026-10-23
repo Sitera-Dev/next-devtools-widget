@@ -149,19 +149,27 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
   // ---- Server trace cookie transport (serverless / Vercel Lambda bridge) ----
   useEffect(() => {
     drainTraceCookies(store.upsert);
-    const interval = setInterval(() => drainTraceCookies(store.upsert), 1000);
+    const interval = setInterval(() => drainTraceCookies(store.upsert), 400);
     const onFocus = () => drainTraceCookies(store.upsert);
     const onVisibility = () => {
       if (document.visibilityState === "visible") drainTraceCookies(store.upsert);
     };
+    const onClick = () => {
+      setTimeout(() => drainTraceCookies(store.upsert), 50);
+      setTimeout(() => drainTraceCookies(store.upsert), 200);
+      setTimeout(() => drainTraceCookies(store.upsert), 500);
+      setTimeout(() => drainTraceCookies(store.upsert), 1000);
+    };
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("click", onClick, { passive: true });
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("click", onClick);
     };
   }, []);
 

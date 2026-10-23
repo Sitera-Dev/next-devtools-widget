@@ -8,7 +8,7 @@ beforeEach(() => {
 });
 
 describe('Client Fetch Proxy & RSC Immunity', () => {
-  it('bypasses /_next/*, /__nextjs, devtools and _rsc URLs completely', async () => {
+  it('bypasses /_next/*, /__nextjs, devtools and pure _rsc navigation URLs completely', async () => {
     const emitted: DevToolsEntry[] = [];
     const mockFetch = vi.fn(async () => new Response('ok', { status: 200 }));
     (window as any).fetch = mockFetch;
@@ -53,7 +53,6 @@ describe('Client Fetch Proxy & RSC Immunity', () => {
     // Simulate Next.js router prefetch object where method might be undefined or non-standard
     const fakeRequest = {
       url: 'https://example.com/api/test',
-      // no method property!
       headers: new Headers(),
     } as unknown as Request;
 
@@ -69,19 +68,21 @@ describe('Client Fetch Proxy & RSC Immunity', () => {
     expect(netEntry.request.method).toBe('GET'); // default fallback
   });
 
-  it('intercepts Server Actions via next-action header and categorizes as action', async () => {
+  it('intercepts Server Actions via next-action header EVEN when URL contains ?_rsc= (production Vercel behavior)', async () => {
     const emitted: DevToolsEntry[] = [];
     const mockFetch = vi.fn(async () => new Response('{"claimed":true}', { status: 200, headers: { 'content-type': 'application/json' } }));
     (window as any).fetch = mockFetch;
     setupClientFetchProxy((entry) => emitted.push(entry));
 
-    await window.fetch('/api/action', {
+    // Next.js production router appends ?_rsc=... and adds rsc: 1 to Server Action POSTs
+    await window.fetch('/login?_rsc=1b7c89', {
       method: 'POST',
       headers: {
         'next-action': 'abc123456789',
+        'rsc': '1',
         'content-type': 'application/json',
       },
-      body: JSON.stringify(['voucher_456']),
+      body: JSON.stringify(['08123456789']),
     });
 
     await vi.waitFor(() => {
