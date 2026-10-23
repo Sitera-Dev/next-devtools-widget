@@ -19,8 +19,11 @@ export function ActionsTab({ entries, onClear }: { entries: DevToolsEntry[]; onC
   const scrollMemory = useRef(0);
 
   const actions: ActionEntry[] = [];
+  const seenIds = new Set<string>();
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
+    if (seenIds.has(e.id)) continue;
+    seenIds.add(e.id);
     if (e.category === 'action') actions.push(e);
   }
   const selected = actions.find((a) => a.id === selectedId);

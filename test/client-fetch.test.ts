@@ -24,6 +24,26 @@ describe('Client Fetch Proxy & RSC Immunity', () => {
     expect(emitted).toHaveLength(0);
   });
 
+  it('bypasses Next.js RSC router prefetch and navigation headers without next-action', async () => {
+    const emitted: DevToolsEntry[] = [];
+    const mockFetch = vi.fn(async () => new Response('rsc payload', { status: 200 }));
+    (window as any).fetch = mockFetch;
+
+    setupClientFetchProxy((entry) => emitted.push(entry));
+
+    // Next.js router prefetch
+    await window.fetch('/vouchers', {
+      headers: { rsc: '1', 'next-router-prefetch': '1' },
+    });
+    // Next.js router navigation
+    await window.fetch('/vouchers', {
+      headers: { rsc: '1' },
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(emitted).toHaveLength(0);
+  });
+
   it('handles custom Request objects without method property without crashing (toUpperCase immunity)', async () => {
     const emitted: DevToolsEntry[] = [];
     const mockFetch = vi.fn(async () => new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } }));

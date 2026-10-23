@@ -39,8 +39,11 @@ export function NetworkTab({ entries, maximized, waterfall, onClear }: Props) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const out: NetworkEntry[] = [];
+    const seenIds = new Set<string>();
     for (let i = entries.length - 1; i >= 0; i--) {
       const e = entries[i];
+      if (seenIds.has(e.id)) continue;
+      seenIds.add(e.id);
       if (e.category !== 'network') continue;
       if (origin !== 'all' && e.origin !== origin) continue;
       if (!matchesStatus(e, status)) continue;

@@ -62,6 +62,27 @@ describe('server fetch patch', () => {
     off();
   });
 
+  it('does not duplicate entries when Next.js wraps globalThis.fetch in a closure calling previous fetch', async () => {
+    registerNextDevTools();
+    const seen: DevToolsEntry[] = [];
+    const off = broadcaster.subscribe((e) => seen.push(e));
+
+    // Simulate Next.js wrapping previous fetch
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (...a: Parameters<typeof fetch>) => {
+      return prevFetch(...a);
+    }) as unknown as typeof fetch;
+
+    await fetch('https://example.com/unique-test-endpoint');
+    await vi.waitFor(() => expect(seen.some((e) => e.category === 'network' && e.state === 'completed')).toBe(true));
+
+    const completed = seen.filter(
+      (e) => e.category === 'network' && e.state === 'completed' && (e as any).request.url === 'https://example.com/unique-test-endpoint',
+    );
+    expect(completed).toHaveLength(1);
+    off();
+  });
+
   it('reports failures without swallowing the error', async () => {
     const seen: DevToolsEntry[] = [];
     const off = broadcaster.subscribe((e) => seen.push(e));

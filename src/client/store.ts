@@ -17,6 +17,8 @@ function createStore() {
   let recording = true;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const listeners = new Set<() => void>();
+  let isHydrated = false;
+  let hydratePromise: Promise<void> | null = null;
 
   const flush = () => {
     timer = null;
@@ -60,6 +62,7 @@ function createStore() {
     },
     clear() {
       buffer = [];
+      isHydrated = false;
       void clearEntries();
       flush();
     },
@@ -73,18 +76,34 @@ function createStore() {
     },
     /** Restore entries persisted by a previous page load (IndexedDB / sessionStorage). */
     async hydrate() {
-      const stored = await loadEntries();
-      const known = new Set(buffer.map((e) => e.id));
-      const restored = stored
-        .filter((e) => !known.has(e.id))
-        .map((e): DevToolsEntry =>
-          e.category === 'network' && e.origin === 'client' && e.state === 'pending'
-            ? { ...e, state: 'failed', error: 'Interrupted (page reloaded)' }
-            : e,
-        );
-      buffer = [...restored, ...buffer].sort((a, b) => entryTimestamp(a) - entryTimestamp(b));
-      trim();
-      flush();
+      if (isHydrated) return;
+      if (hydratePromise) return hydratePromise;
+
+      hydratePromise = (async () => {
+        try {
+          const stored = await loadEntries();
+          const byId = new Map<string, DevToolsEntry>();
+          for (const item of stored) {
+            const e =
+              item.category === 'network' && item.origin === 'client' && item.state === 'pending'
+                ? { ...item, state: 'failed', error: 'Interrupted (page reloaded)' }
+                : item;
+            byId.set(e.id, e);
+          }
+          // Current in-memory buffer wins over older stored entries
+          for (const item of buffer) {
+            byId.set(item.id, item);
+          }
+          buffer = Array.from(byId.values()).sort((a, b) => entryTimestamp(a) - entryTimestamp(b));
+          trim();
+          flush();
+          isHydrated = true;
+        } finally {
+          hydratePromise = null;
+        }
+      })();
+
+      return hydratePromise;
     },
   };
 }

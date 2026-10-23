@@ -10,8 +10,11 @@ export function CacheTab({ entries, onClear }: { entries: DevToolsEntry[]; onCle
   const scrollMemory = useRef(0);
 
   const items: CacheEntry[] = [];
+  const seenIds = new Set<string>();
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
+    if (seenIds.has(e.id)) continue;
+    seenIds.add(e.id);
     if (e.category === 'cache') items.push(e);
   }
   const selected = items.find((c) => c.id === selectedId);

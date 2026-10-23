@@ -7,7 +7,7 @@ import {
   getRequestHeaders,
   getUrl,
   headersToObject,
-  isInternalUrl,
+  isInternalRequest,
   safeClone,
 } from '../shared/utils';
 
@@ -25,31 +25,35 @@ type FetchFn = typeof fetch;
  */
 export function setupClientFetchProxy(emit: (entry: DevToolsEntry) => void): void {
   const w = window as unknown as Record<string, unknown> & { fetch?: FetchFn };
-  if (typeof w.fetch !== 'function' || w[PATCHED]) return;
+  if (typeof w.fetch !== 'function' || w[PATCHED] || (w.fetch as any)[PATCHED]) return;
   w[PATCHED] = true;
 
   const originalFetch: FetchFn = w.fetch;
 
-  w.fetch = function devtoolsFetch(...args: Parameters<FetchFn>): Promise<Response> {
+  const devtoolsFetch = function devtoolsFetch(...args: Parameters<FetchFn>): Promise<Response> {
     const promise = originalFetch.apply(window, args);
     try {
       const url = getUrl(args[0]);
-      if (!isInternalUrl(url)) observe(url, args, promise, emit);
+      const headers = getRequestHeaders(args[0], args[1]);
+      if (!isInternalRequest(url, headers)) observe(url, args, headers, promise, emit);
     } catch {
       /* observing must never affect the caller */
     }
     return promise;
   } as FetchFn;
+
+  (devtoolsFetch as any)[PATCHED] = true;
+  w.fetch = devtoolsFetch;
 }
 
 function observe(
   url: string,
   [input, init]: Parameters<FetchFn>,
+  headers: Record<string, string>,
   promise: Promise<Response>,
   emit: (e: DevToolsEntry) => void,
 ): void {
   const method = getMethod(input, init);
-  const headers = getRequestHeaders(input, init);
   const startTime = Date.now();
   // The call already started; keep the clock as close to it as possible.
   const t0 = performance.now();

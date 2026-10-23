@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { broadcaster } from './event-broadcaster';
 import type { CacheEntry, NetworkEntry } from '../shared/types';
 import {
@@ -9,13 +10,15 @@ import {
   getRequestHeaders,
   getUrl,
   headersToObject,
-  isInternalUrl,
+  isInternalRequest,
   safeClone,
 } from '../shared/utils';
 
 type FetchFn = typeof fetch;
 
 const PATCHED = Symbol.for('next-devtools.fetch-patched');
+const DEVTOOLS_FETCH = Symbol.for('next-devtools.fetch-wrapped');
+const fetchContext = new AsyncLocalStorage<boolean>();
 
 function isCacheable(init: RequestInit | undefined): { tags: string[]; revalidate?: number | false } | null {
   const next = (init as { next?: { tags?: string[]; revalidate?: number | false } } | undefined)?.next;
@@ -27,12 +30,18 @@ function isCacheable(init: RequestInit | undefined): { tags: string[]; revalidat
 
 function wrapFetch(original: FetchFn): FetchFn {
   const wrapped = function devtoolsFetch(this: unknown, ...args: Parameters<FetchFn>): Promise<Response> {
+    // If we are already executing inside a devtoolsFetch call on this async stack, pass through directly
+    if (fetchContext.getStore()) {
+      return original.apply(this, args);
+    }
+
     const [input, init] = args;
     // Nobody is watching: zero overhead, zero allocation.
     if (!broadcaster.hasListeners()) return original.apply(this, args);
 
     const url = getUrl(input);
-    if (isInternalUrl(url)) return original.apply(this, args);
+    const headers = getRequestHeaders(input, init);
+    if (isInternalRequest(url, headers)) return original.apply(this, args);
 
     const method = getMethod(input, init);
     const startTime = Date.now();
@@ -48,14 +57,14 @@ function wrapFetch(original: FetchFn): FetchFn {
       request: {
         url,
         method,
-        headers: getRequestHeaders(input, init),
+        headers,
         ...describeBody(init?.body),
         timestamp: startTime,
       },
     };
     broadcaster.broadcast(entry);
 
-    const promise = original.apply(this, args);
+    const promise = fetchContext.run(true, () => original.apply(this, args));
 
     // Observe in the background so the caller's promise is returned untouched.
     promise.then(
@@ -127,6 +136,7 @@ function wrapFetch(original: FetchFn): FetchFn {
     );
     return promise;
   } as FetchFn;
+  Object.defineProperty(wrapped, DEVTOOLS_FETCH, { value: true });
   return wrapped;
 }
 
@@ -137,9 +147,11 @@ export function registerNextDevTools(): void {
 
   let current: FetchFn = g.fetch;
   const rewrap = (fn: FetchFn): FetchFn => {
+    if ((fn as any)[DEVTOOLS_FETCH]) return fn;
     const w = wrapFetch(fn);
     // Carry over Next.js markers (`__nextPatched`, ...) so Next doesn't wrap us a second time.
     Object.assign(w, fn);
+    Object.defineProperty(w, DEVTOOLS_FETCH, { value: true });
     return w;
   };
   let wrapped = rewrap(current);
@@ -153,6 +165,7 @@ export function registerNextDevTools(): void {
       enumerable: true,
       get: () => wrapped,
       set: (next: FetchFn) => {
+        if (next === wrapped || (next as any)[DEVTOOLS_FETCH]) return;
         current = next;
         wrapped = rewrap(next);
       },
