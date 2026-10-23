@@ -63,7 +63,8 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "node --expose-gc ./node_modules/vitest/vitest.mjs run",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "next": ">=14.0.0",
