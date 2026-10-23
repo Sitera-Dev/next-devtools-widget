@@ -1656,6 +1656,62 @@ function TriggerButton(p) {
 
 // src/client/cookie-transport.ts
 var TRACE_COOKIE_PREFIX = "__ndt_trace_";
+function decodeB64(str) {
+  try {
+    const binary = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+    return decodeURIComponent(escape(binary));
+  } catch {
+    return atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+  }
+}
+async function decompressDeflate(str) {
+  const binary = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  if (typeof DecompressionStream !== "undefined") {
+    const ds = new DecompressionStream("deflate");
+    const writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const reader = ds.readable.getReader();
+    const chunks = [];
+    while (true) {
+      const { done: done2, value } = await reader.read();
+      if (done2) break;
+      if (value) chunks.push(value);
+    }
+    const total = chunks.reduce((a, c) => a + c.length, 0);
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      out.set(c, off);
+      off += c.length;
+    }
+    return new TextDecoder().decode(out);
+  }
+  throw new Error("DecompressionStream unavailable");
+}
+async function parseCookieValue(val) {
+  try {
+    let jsonString = "";
+    if (val.startsWith("z:")) {
+      jsonString = await decompressDeflate(val.slice(2));
+    } else if (val.startsWith("b:")) {
+      jsonString = decodeB64(val.slice(2));
+    } else {
+      jsonString = decodeURIComponent(val);
+    }
+    const entry = JSON.parse(jsonString);
+    if (entry && typeof entry === "object" && entry.id && entry.category) {
+      return entry;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 function drainTraceCookies(emit) {
   if (typeof document === "undefined" || !document.cookie) return;
   const rawCookies = document.cookie;
@@ -1668,15 +1724,21 @@ function drainTraceCookies(emit) {
     if (eqIdx === -1) continue;
     const name = trimmed.slice(0, eqIdx).trim();
     const val = trimmed.slice(eqIdx + 1).trim();
+    document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
     try {
-      const decoded = decodeURIComponent(val);
-      const entry = JSON.parse(decoded);
-      if (entry && typeof entry === "object" && entry.id && entry.category) {
-        emit(entry);
+      if (val.startsWith("z:")) {
+        void parseCookieValue(val).then((entry) => {
+          if (entry) emit(entry);
+        }).catch(() => {
+        });
+      } else {
+        const jsonString = val.startsWith("b:") ? decodeB64(val.slice(2)) : decodeURIComponent(val);
+        const entry = JSON.parse(jsonString);
+        if (entry && typeof entry === "object" && entry.id && entry.category) {
+          emit(entry);
+        }
       }
     } catch {
-    } finally {
-      document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
     }
   }
 }

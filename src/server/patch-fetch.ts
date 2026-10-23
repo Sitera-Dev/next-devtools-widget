@@ -1,5 +1,6 @@
 import { recordSsrTrace, trackInFlightFetch } from './ssr-store';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { deflateSync } from 'node:zlib';
 import { broadcaster } from "./event-broadcaster";
 import type { CacheEntry, NetworkEntry } from "../shared/types";
 import {
@@ -48,6 +49,21 @@ function getNextHeaders(): Promise<typeof import('next/headers') | null> {
   return nextHeadersPromise;
 }
 
+export function encodeTracePayload(payload: NetworkEntry): string {
+  const serialized = JSON.stringify(payload);
+  try {
+    const deflated = deflateSync(Buffer.from(serialized, "utf-8"));
+    const b64 = deflated.toString("base64url");
+    const simpleB64 = Buffer.from(serialized, "utf-8").toString("base64url");
+    if (b64.length < simpleB64.length) {
+      return `z:${b64}`;
+    }
+    return `b:${simpleB64}`;
+  } catch {
+    return `b:${Buffer.from(serialized, "utf-8").toString("base64url")}`;
+  }
+}
+
 export async function writeTraceCookie(entry: NetworkEntry): Promise<void> {
   try {
     const nextHeaders = await getNextHeaders();
@@ -56,11 +72,11 @@ export async function writeTraceCookie(entry: NetworkEntry): Promise<void> {
     const cookieJar = await Promise.resolve(nextHeaders.cookies());
     if (!cookieJar || typeof cookieJar.set !== "function") return;
 
-    // Truncate response body if needed to avoid 4KB cookie header limit
+    // Generous limit for response body (deflate compresses 6KB to ~1KB)
     const body = entry.response?.body;
     const truncatedBody =
-      body && body.length > 2000
-        ? body.slice(0, 2000) + "... [truncated for cookie transport]"
+      body && body.length > 6000
+        ? body.slice(0, 6000) + "... [truncated for cookie transport]"
         : body;
 
     const payload: NetworkEntry = {
@@ -73,11 +89,10 @@ export async function writeTraceCookie(entry: NetworkEntry): Promise<void> {
         : undefined,
     };
 
-    let serialized = JSON.stringify(payload);
-    let encoded = encodeURIComponent(serialized);
+    let encoded = encodeTracePayload(payload);
 
-    // If encoded length is > 3500 bytes, trim request/response further
-    if (encoded.length > 3500) {
+    // If encoded length is > 3800 bytes, trim request/response further
+    if (encoded.length > 3800) {
       const minimalPayload: NetworkEntry = {
         id: entry.id,
         category: "network",
@@ -102,16 +117,16 @@ export async function writeTraceCookie(entry: NetworkEntry): Promise<void> {
             }
           : undefined,
       };
-      encoded = encodeURIComponent(JSON.stringify(minimalPayload));
+      encoded = encodeTracePayload(minimalPayload);
     }
 
     const cookieName = `${TRACE_COOKIE_PREFIX}${entry.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(-12)}`;
 
     cookieJar.set(cookieName, encoded, {
-      path: '/',
+      path: "/",
       maxAge: 60,
       httpOnly: false,
-      sameSite: 'lax',
+      sameSite: "lax",
     });
   } catch {
     // In read-only Server Component renders or environments without cookie context,

@@ -96,6 +96,7 @@ function clearSsrTraces() {
 
 // src/server/patch-fetch.ts
 var import_node_async_hooks = require("async_hooks");
+var import_node_zlib = require("zlib");
 
 // src/server/event-broadcaster.ts
 var KEY = /* @__PURE__ */ Symbol.for("next-devtools.broadcaster");
@@ -303,6 +304,20 @@ function getNextHeaders() {
   }
   return nextHeadersPromise;
 }
+function encodeTracePayload(payload) {
+  const serialized = JSON.stringify(payload);
+  try {
+    const deflated = (0, import_node_zlib.deflateSync)(Buffer.from(serialized, "utf-8"));
+    const b64 = deflated.toString("base64url");
+    const simpleB64 = Buffer.from(serialized, "utf-8").toString("base64url");
+    if (b64.length < simpleB64.length) {
+      return `z:${b64}`;
+    }
+    return `b:${simpleB64}`;
+  } catch {
+    return `b:${Buffer.from(serialized, "utf-8").toString("base64url")}`;
+  }
+}
 async function writeTraceCookie(entry) {
   try {
     const nextHeaders = await getNextHeaders();
@@ -310,7 +325,7 @@ async function writeTraceCookie(entry) {
     const cookieJar = await Promise.resolve(nextHeaders.cookies());
     if (!cookieJar || typeof cookieJar.set !== "function") return;
     const body = entry.response?.body;
-    const truncatedBody = body && body.length > 2e3 ? body.slice(0, 2e3) + "... [truncated for cookie transport]" : body;
+    const truncatedBody = body && body.length > 6e3 ? body.slice(0, 6e3) + "... [truncated for cookie transport]" : body;
     const payload = {
       ...entry,
       response: entry.response ? {
@@ -318,9 +333,8 @@ async function writeTraceCookie(entry) {
         body: truncatedBody ?? null
       } : void 0
     };
-    let serialized = JSON.stringify(payload);
-    let encoded = encodeURIComponent(serialized);
-    if (encoded.length > 3500) {
+    let encoded = encodeTracePayload(payload);
+    if (encoded.length > 3800) {
       const minimalPayload = {
         id: entry.id,
         category: "network",
@@ -343,7 +357,7 @@ async function writeTraceCookie(entry) {
           body: "[body omitted: exceeded cookie size limit]"
         } : void 0
       };
-      encoded = encodeURIComponent(JSON.stringify(minimalPayload));
+      encoded = encodeTracePayload(minimalPayload);
     }
     const cookieName = `${TRACE_COOKIE_PREFIX}${entry.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(-12)}`;
     cookieJar.set(cookieName, encoded, {
