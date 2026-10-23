@@ -1,4 +1,5 @@
 // src/index.tsx
+import { Suspense } from "react";
 import {
   NextDevToolsClient
 } from "./client.mjs";
@@ -14,8 +15,8 @@ function getStore() {
 }
 async function waitForSsrTraces(timeoutMs = 1500) {
   const s = getStore();
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
     if (s.inFlight.size === 0) {
       await new Promise((resolve) => setTimeout(resolve, 30));
       if (s.inFlight.size === 0) {
@@ -37,14 +38,7 @@ import {
   setupSsrObserver
 } from "./client.mjs";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
-async function NextDevTools({
-  children,
-  ...props
-}) {
-  const isEnabled = props.enabled ?? (process.env.NODE_ENV === "development" || process.env.NEXT_DEVTOOLS_ENABLED === "true" || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true");
-  if (!isEnabled) {
-    return children ? /* @__PURE__ */ jsx(Fragment, { children }) : null;
-  }
+async function SsrCollector(props) {
   let tracesPayload = "";
   if (typeof window === "undefined") {
     try {
@@ -56,7 +50,6 @@ async function NextDevTools({
     }
   }
   return /* @__PURE__ */ jsxs(Fragment, { children: [
-    children,
     tracesPayload ? /* @__PURE__ */ jsx(
       "script",
       {
@@ -68,6 +61,11 @@ async function NextDevTools({
     ) : null,
     /* @__PURE__ */ jsx(NextDevToolsClient, { ...props })
   ] });
+}
+function NextDevTools(props) {
+  const isEnabled = props.enabled ?? (process.env.NODE_ENV === "development" || process.env.NEXT_DEVTOOLS_ENABLED === "true" || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true");
+  if (!isEnabled) return null;
+  return /* @__PURE__ */ jsx(Suspense, { fallback: /* @__PURE__ */ jsx(NextDevToolsClient, { ...props }), children: /* @__PURE__ */ jsx(SsrCollector, { ...props }) });
 }
 export {
   NextDevTools,

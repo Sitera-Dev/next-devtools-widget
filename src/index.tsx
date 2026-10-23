@@ -1,28 +1,11 @@
-import React from "react";
+import React, { Suspense } from "react";
 import {
   NextDevToolsClient,
   type NextDevToolsProps,
 } from "./client";
 import { waitForSsrTraces } from "./server/ssr-store";
 
-export interface UnifiedNextDevToolsProps extends NextDevToolsProps {
-  children?: React.ReactNode;
-}
-
-export async function NextDevTools({
-  children,
-  ...props
-}: UnifiedNextDevToolsProps) {
-  const isEnabled =
-    props.enabled ??
-    (process.env.NODE_ENV === "development" ||
-      process.env.NEXT_DEVTOOLS_ENABLED === "true" ||
-      process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true");
-
-  if (!isEnabled) {
-    return children ? <>{children}</> : null;
-  }
-
+async function SsrCollector(props: NextDevToolsProps) {
   let tracesPayload = "";
   if (typeof window === "undefined") {
     try {
@@ -37,7 +20,6 @@ export async function NextDevTools({
 
   return (
     <>
-      {children}
       {tracesPayload ? (
         <script
           type="application/json"
@@ -48,6 +30,22 @@ export async function NextDevTools({
       ) : null}
       <NextDevToolsClient {...props} />
     </>
+  );
+}
+
+export function NextDevTools(props: NextDevToolsProps) {
+  const isEnabled =
+    props.enabled ??
+    (process.env.NODE_ENV === "development" ||
+      process.env.NEXT_DEVTOOLS_ENABLED === "true" ||
+      process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true");
+
+  if (!isEnabled) return null;
+
+  return (
+    <Suspense fallback={<NextDevToolsClient {...props} />}>
+      <SsrCollector {...props} />
+    </Suspense>
   );
 }
 

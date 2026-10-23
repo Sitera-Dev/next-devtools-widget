@@ -27,6 +27,7 @@ __export(src_exports, {
   setupSsrObserver: () => import_client2.setupSsrObserver
 });
 module.exports = __toCommonJS(src_exports);
+var import_react = require("react");
 var import_client = require("./client.js");
 
 // src/server/ssr-store.ts
@@ -40,8 +41,8 @@ function getStore() {
 }
 async function waitForSsrTraces(timeoutMs = 1500) {
   const s = getStore();
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + timeoutMs;
+  while (performance.now() < deadline) {
     if (s.inFlight.size === 0) {
       await new Promise((resolve) => setTimeout(resolve, 30));
       if (s.inFlight.size === 0) {
@@ -59,14 +60,7 @@ async function waitForSsrTraces(timeoutMs = 1500) {
 // src/index.tsx
 var import_client2 = require("./client.js");
 var import_jsx_runtime = require("react/jsx-runtime");
-async function NextDevTools({
-  children,
-  ...props
-}) {
-  const isEnabled = props.enabled ?? (process.env.NODE_ENV === "development" || process.env.NEXT_DEVTOOLS_ENABLED === "true" || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true");
-  if (!isEnabled) {
-    return children ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children }) : null;
-  }
+async function SsrCollector(props) {
   let tracesPayload = "";
   if (typeof window === "undefined") {
     try {
@@ -78,7 +72,6 @@ async function NextDevTools({
     }
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-    children,
     tracesPayload ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       "script",
       {
@@ -90,6 +83,11 @@ async function NextDevTools({
     ) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_client.NextDevToolsClient, { ...props })
   ] });
+}
+function NextDevTools(props) {
+  const isEnabled = props.enabled ?? (process.env.NODE_ENV === "development" || process.env.NEXT_DEVTOOLS_ENABLED === "true" || process.env.NEXT_PUBLIC_ENABLE_DEVTOOLS === "true");
+  if (!isEnabled) return null;
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_react.Suspense, { fallback: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_client.NextDevToolsClient, { ...props }), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SsrCollector, { ...props }) });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

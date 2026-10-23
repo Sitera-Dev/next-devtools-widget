@@ -43,13 +43,14 @@ export function getRecentSsrTraces(): NetworkEntry[] {
 /**
  * Awaits currently active in-flight fetches so that when <NextDevTools />
  * renders, it captures all fetches triggered by child server components.
+ * Uses performance.now() to comply with Next.js prerender guidelines.
  * Times out after timeoutMs to ensure rendering is never blocked.
  */
 export async function waitForSsrTraces(timeoutMs = 1500): Promise<NetworkEntry[]> {
   const s = getStore();
-  const deadline = Date.now() + timeoutMs;
+  const deadline = performance.now() + timeoutMs;
 
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     if (s.inFlight.size === 0) {
       // Allow a brief grace period (30ms) for concurrent Server Components
       // (e.g. after `await connection()`, `await cookies()`, or dynamic imports)

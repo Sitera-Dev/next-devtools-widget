@@ -78,6 +78,7 @@ declare function getRecentSsrTraces(): NetworkEntry[];
 /**
  * Awaits currently active in-flight fetches so that when <NextDevTools />
  * renders, it captures all fetches triggered by child server components.
+ * Uses performance.now() to comply with Next.js prerender guidelines.
  * Times out after timeoutMs to ensure rendering is never blocked.
  */
 declare function waitForSsrTraces(timeoutMs?: number): Promise<NetworkEntry[]>;

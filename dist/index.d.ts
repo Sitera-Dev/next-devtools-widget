@@ -119,9 +119,6 @@ declare function drainSsrTraces(emit: (entry: DevToolsEntry) => void): void;
  */
 declare function setupSsrObserver(emit: (entry: DevToolsEntry) => void): () => void;
 
-interface UnifiedNextDevToolsProps extends NextDevToolsProps {
-    children?: React.ReactNode;
-}
-declare function NextDevTools({ children, ...props }: UnifiedNextDevToolsProps): Promise<React.JSX.Element | null>;
+declare function NextDevTools(props: NextDevToolsProps): React.JSX.Element | null;
 
-export { type ActionEntry, type CacheEntry, type Corner, type DevToolsEntry, type NetworkEntry, NextDevTools, NextDevTools$1 as NextDevToolsClient, type NextDevToolsProps, type RedactRule, type SystemInfo, type TabId, type UnifiedNextDevToolsProps, drainSsrTraces, drainTraceCookies, setupSsrObserver };
+export { type ActionEntry, type CacheEntry, type Corner, type DevToolsEntry, type NetworkEntry, NextDevTools, NextDevTools$1 as NextDevToolsClient, type NextDevToolsProps, type RedactRule, type SystemInfo, type TabId, drainSsrTraces, drainTraceCookies, setupSsrObserver };
