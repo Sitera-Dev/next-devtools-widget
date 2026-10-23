@@ -143,6 +143,10 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
     void store.hydrate();
     const unsubSsr = setupSsrObserver(store.upsert);
     const unsubSse = connectSse();
+    // Once mounted and hydrated, expire any ephemeral clear flag
+    if (typeof document !== "undefined" && document.cookie.includes("__ndt_clear")) {
+      document.cookie = "__ndt_clear=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
     return () => { unsubSsr(); unsubSse(); };
   }, []);
 

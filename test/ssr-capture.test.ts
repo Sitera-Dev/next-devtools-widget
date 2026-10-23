@@ -60,6 +60,25 @@ describe("SSR Capture & Synchronization", () => {
       const traces = await waitForSsrTraces(500);
       expect(traces.some((t) => t.id === "srv_async_1")).toBe(true);
     });
+
+    it("drains buffered traces so old traces do not leak into future page renders", async () => {
+      recordSsrTrace({
+        id: "srv_page_1",
+        category: "network",
+        origin: "server",
+        state: "completed",
+        request: { url: "https://api.test/page1", method: "GET", headers: {}, timestamp: Date.now() },
+      });
+
+      // Page 1 renders and gathers traces
+      const page1Traces = await waitForSsrTraces(0);
+      expect(page1Traces).toHaveLength(1);
+      expect(page1Traces[0].id).toBe("srv_page_1");
+
+      // Page 2 renders later without any fetches
+      const page2Traces = await waitForSsrTraces(0);
+      expect(page2Traces).toHaveLength(0); // Must be empty!
+    });
   });
 
   describe("ssr-drainer", () => {

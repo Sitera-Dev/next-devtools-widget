@@ -19,6 +19,12 @@ function createStore() {
   const listeners = new Set<() => void>();
   let isHydrated = false;
   let hydratePromise: Promise<void> | null = null;
+  let clearedAt = 0;
+  if (typeof window !== "undefined") {
+    try {
+      clearedAt = Number(sessionStorage.getItem("next-devtools:cleared-at") || 0);
+    } catch {}
+  }
 
   const flush = () => {
     timer = null;
@@ -61,6 +67,12 @@ function createStore() {
       schedule();
     },
     clear() {
+      if (typeof document !== "undefined") {
+        try {
+          // Tell server to drop historical traces on next render/refresh
+          document.cookie = "__ndt_clear=1; path=/; max-age=60; SameSite=Lax";
+        } catch {}
+      }
       buffer = [];
       isHydrated = false;
       void clearEntries();

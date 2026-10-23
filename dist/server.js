@@ -86,7 +86,9 @@ async function waitForSsrTraces(timeoutMs = 1500) {
       new Promise((resolve) => setTimeout(resolve, 25))
     ]);
   }
-  return s.buffer.slice();
+  const traces = s.buffer.slice();
+  s.buffer.length = 0;
+  return traces;
 }
 function clearSsrTraces() {
   const s = getStore();

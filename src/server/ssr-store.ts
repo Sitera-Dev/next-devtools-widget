@@ -67,7 +67,9 @@ export async function waitForSsrTraces(timeoutMs = 1500): Promise<NetworkEntry[]
     ]);
   }
 
-  return s.buffer.slice();
+  const traces = s.buffer.slice();
+  s.buffer.length = 0;
+  return traces;
 }
 
 export function clearSsrTraces(): void {

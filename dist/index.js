@@ -1,7 +1,9 @@
 "use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -15,6 +17,14 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.tsx
@@ -54,7 +64,9 @@ async function waitForSsrTraces(timeoutMs = 1500) {
       new Promise((resolve) => setTimeout(resolve, 25))
     ]);
   }
-  return s.buffer.slice();
+  const traces = s.buffer.slice();
+  s.buffer.length = 0;
+  return traces;
 }
 
 // src/index.tsx
@@ -64,8 +76,19 @@ async function SsrCollector(props) {
   let tracesPayload = "";
   if (typeof window === "undefined") {
     try {
+      let isCleared = false;
+      try {
+        const nextHeaders = await import("next/headers");
+        if (nextHeaders && typeof nextHeaders.cookies === "function") {
+          const cookieJar = await Promise.resolve(nextHeaders.cookies());
+          if (cookieJar && cookieJar.get("__ndt_clear")?.value === "1") {
+            isCleared = true;
+          }
+        }
+      } catch {
+      }
       const traces = await waitForSsrTraces(1500);
-      if (traces && traces.length > 0) {
+      if (!isCleared && traces && traces.length > 0) {
         tracesPayload = JSON.stringify(traces).replace(/</g, "\\u003c");
       }
     } catch {

@@ -2216,6 +2216,13 @@ function createStore() {
   const listeners = /* @__PURE__ */ new Set();
   let isHydrated = false;
   let hydratePromise = null;
+  let clearedAt = 0;
+  if (typeof window !== "undefined") {
+    try {
+      clearedAt = Number(sessionStorage.getItem("next-devtools:cleared-at") || 0);
+    } catch {
+    }
+  }
   const flush = () => {
     timer = null;
     state = { ...state, entries: buffer.slice() };
@@ -2255,6 +2262,12 @@ function createStore() {
       schedule();
     },
     clear() {
+      if (typeof document !== "undefined") {
+        try {
+          document.cookie = "__ndt_clear=1; path=/; max-age=60; SameSite=Lax";
+        } catch {
+        }
+      }
       buffer = [];
       isHydrated = false;
       void clearEntries();
@@ -2408,6 +2421,9 @@ function DevToolsApp({ position, defaultOpen, hotkey, maxEntries, redact, tabs }
     void store.hydrate();
     const unsubSsr = setupSsrObserver(store.upsert);
     const unsubSse = connectSse();
+    if (typeof document !== "undefined" && document.cookie.includes("__ndt_clear")) {
+      document.cookie = "__ndt_clear=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
     return () => {
       unsubSsr();
       unsubSse();
